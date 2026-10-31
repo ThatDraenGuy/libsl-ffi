@@ -1,0 +1,3 @@
+[submodule "libsl"]
+	path = libsl
+	url = https://github.com/vpa-research/libsl-rs.git

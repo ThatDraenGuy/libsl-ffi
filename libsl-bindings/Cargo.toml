@@ -1,0 +1,15 @@
+[package]
+name = "libsl-bindings"
+version = "0.2.0"
+edition = "2021"
+
+[dependencies]
+libsl = { path = "../libsl" }
+
+uniffi.workspace = true
+
+[build-dependencies]
+uniffi = { workspace = true, features = ["build"] }
+
+[lib]
+crate-type = ["cdylib", "staticlib", "lib"]

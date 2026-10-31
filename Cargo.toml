@@ -1,0 +1,8 @@
+[workspace]
+
+members = ["libsl-bindings", "libsl-bindgen"]
+exclude = ["libsl"]                           # nested workspaces не поддерживаются
+resolver = "2"
+
+[workspace.dependencies]
+uniffi = "0.30.0"
