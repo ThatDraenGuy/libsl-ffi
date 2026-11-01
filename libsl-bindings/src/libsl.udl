@@ -1,0 +1,1362 @@
+//====== common types ======
+
+[Custom]
+typedef u64 usize;
+
+[Custom]
+typedef u64 AnnotationId;
+[Custom]
+typedef u64 DeclId;
+[Custom]
+typedef u64 ExprId;
+[Custom]
+typedef u64 FileId;
+[Custom]
+typedef u64 PredId;
+[Custom]
+typedef u64 StmtId;
+[Custom]
+typedef u64 TyExprId;
+
+
+[Custom]
+typedef u64 NonZeroUsize;
+
+//====== loc.rs ======
+/// A location in a source file.
+[Enum] interface FFILoc {
+    /// No location information available, for example for synthesized constructs.
+    Synthetic();
+
+    /// The location corresponds to a span in the source file.
+    LocSpan(Span span);
+};
+[Custom]
+typedef FFILoc Loc;
+
+/// A contiguous range of bytes in a source file.
+[Remote] dictionary Span {
+    /// The starting byte's offset.
+    usize start;
+    /// A length of the span in bytes.
+    usize len;
+    /// A file identifier.
+    FileId file_id;
+    /// A line number, counted from 1.
+    NonZeroUsize? line;
+    /// A column number, counted from 1.
+    NonZeroUsize? col;
+};
+
+//====== ast.rs ======
+
+/// A LibSL header declaration.
+[Remote] dictionary Header {
+    /// The header's location in the source text.
+    Loc loc;
+
+    /// The specified LibSL version.
+    ///
+    /// LibSL export requires this to be a valid LibSL string.
+    string libsl_version;
+
+    /// The name of the library described by this specification.
+    ///
+    /// LibSL export requires this to be a valid LibSL identifier.
+    string library_name;
+
+    /// The version of the library described by this specification.
+    ///
+    /// LibSL export requires this to be a valid LibSL string.
+    string? version;
+
+    /// The language the library described by this specification is implemented in.
+    ///
+    /// LibSL export requires this to be a valid LibSL string.
+    string? language;
+
+    /// The URL to the library.
+    ///
+    /// LibSL export requires this to be a valid LibSL string. Otherwise, no requirements on URL
+    /// validity are imposed.
+    string? url;
+};
+
+/// A single LibSL file.
+[Remote] dictionary File {
+    /// The file's location in the source text.
+    Loc loc;
+
+    /// The LibSL header declaration.
+    Header? header;
+
+    /// The top-level declarations in the file.
+    sequence<DeclId> decls;
+};
+
+/// An entity declaration.
+[Remote] dictionary Decl {
+    /// A unique identifier for this declaration, usable as a (secondary) slotmap key.
+    ///
+    /// This allows to associate additional information with the declaration as well as refer to it
+    /// without violating borrowing rules.
+    DeclId id;
+
+    /// The declaration's location in the source text.
+    Loc loc;
+
+    /// What kind of declaration this is.
+    ///
+    /// The variants hold data specific to each declaration kind.
+    DeclKind kind;
+};
+
+/// An enumeration of all possible declaration kinds.
+[Enum] interface FFIDeclKind {
+    /// A dummy declaration, the default value of `DeclKind`.
+    ///
+    /// Allows using `mem::take` to take ownership of the value.
+    Dummy();
+
+    /// An import declaration.
+    Import(DeclImport decl);
+
+    /// An include declaration.
+    Include(DeclInclude decl);
+
+    /// A semantic type declared in a `types` section.
+    SemanticTy(DeclSemanticTy decl);
+
+    /// A type alias declaration.
+    TyAlias(DeclTyAlias decl);
+
+    /// A structure type declaration.
+    Struct(DeclStruct decl);
+
+    /// An enum type declaration.
+    Enum(DeclEnum decl);
+
+    /// An annotation declaration.
+    Annotation(DeclAnnotation decl);
+
+    /// An action declaration.
+    Action(DeclAction decl);
+
+    /// An automaton declaration.
+    Automaton(DeclAutomaton decl);
+
+    /// A function declaration.
+    Function(DeclFunction decl);
+
+    /// A variable declaration.
+    Variable(DeclVariable decl);
+
+    /// An automaton state declaration.
+    State(DeclState decl);
+
+    /// An automaton state transfer function declaration.
+    Shift(DeclShift decl);
+
+    /// An automaton constructor declaration.
+    Constructor(DeclConstructor decl);
+
+    /// An automaton destructor declaration.
+    Destructor(DeclDestructor decl);
+
+    /// A procedure declaration.
+    Proc(DeclProc decl);
+
+    /// A predicate declaration.
+    Pred(DeclPred decl);
+};
+[Custom]
+typedef FFIDeclKind DeclKind;
+
+/// An import declaration.
+[Remote] dictionary DeclImport {
+    /// An interpreted import path.
+    string path;
+};
+
+/// An include declaration.
+[Remote] dictionary DeclInclude {
+    /// An uninterpreted include path.
+    string path;
+};
+
+/// A semantic type declaration.
+[Remote] dictionary DeclSemanticTy {
+    /// A list of annotations for this declaration.
+    sequence<AnnotationId> annotations;
+
+    /// The name of the semantic type.
+    QualifiedTyName ty_name;
+
+    /// The underlying type representation.
+    TyExprId real_ty;
+
+    /// The specific kind of semantic type.
+    SemanticTyKind kind;
+};
+
+/// An enumeration of possible semantic type kinds.
+[Enum] interface FFISemanticTyKind {
+    /// A simple semantic type.
+    Simple();
+
+    /// A semantic type with enumerated named values.
+    Enumerated(sequence<SemanticTyEnumValue> values);
+};
+[Custom]
+typedef FFISemanticTyKind SemanticTyKind;
+
+/// A named value of an enumerated semantic type.
+[Remote] dictionary SemanticTyEnumValue {
+    /// The name of the semantic type's value.
+    Name name;
+
+    /// The underlying value represented by this entry.
+    ExprId expr;
+};
+
+/// A type alias declaration.
+[Remote] dictionary DeclTyAlias {
+    /// A list of annotations for this declaration.
+    sequence<AnnotationId> annotations;
+
+    /// The alias's name.
+    QualifiedTyName ty_name;
+
+    /// The type represented by this alias.
+    TyExprId ty_expr;
+};
+
+/// A structure type declaration.
+[Remote] dictionary DeclStruct {
+    /// A list of annotations for this declaration.
+    sequence<AnnotationId> annotations;
+
+    /// The declared type's name.
+    QualifiedTyName ty_name;
+
+    /// The type expression specified after the `is` keyword in the type declaration.
+    TyExprId? is_ty;
+
+    /// The type expressions specified after the `for` keyword in the type declaration.
+    sequence<TyExprId> for_tys;
+
+    /// Type parameter constraints, specified in a `where`-clause.
+    sequence<TyConstraint> ty_constraints;
+
+    /// Entities (variables, functions, and procedures) defined as members of this type.
+    sequence<DeclId> decls;
+};
+
+/// An enum type declaration.
+[Remote] dictionary DeclEnum {
+    /// A list of annotations for this declaration.
+    sequence<AnnotationId> annotations;
+
+    /// The declared type's name.
+    QualifiedTyName ty_name;
+
+    /// Possible values of the type.
+    sequence<EnumVariant> variants;
+};
+
+/// An enum type variant.
+[Remote] dictionary EnumVariant {
+    /// The name of the variant.
+    Name name;
+
+    /// The value of the variant.
+    IntLit value;
+
+    /// The [`Loc`] associated with the value expression.
+    Loc value_loc;
+};
+
+/// An annotation declaration.
+[Remote] dictionary DeclAnnotation {
+    /// The name of the annotation.
+    Name name;
+
+    /// A list of parameters declared for this annotation.
+    sequence<AnnotationParam> params;
+};
+
+/// An annotation parameter.
+[Remote] dictionary AnnotationParam {
+    /// The name of the parameter.
+    Name name;
+
+    /// The type of the parameter.
+    TyExprId ty_expr;
+
+    /// The default value for the parameter.
+    ExprId? default;
+};
+
+/// An action declaration.
+[Remote] dictionary DeclAction {
+    /// A list of annotations for this declaration.
+    sequence<AnnotationId> annotations;
+
+    /// The name of the action.
+    Name name;
+
+    /// A list of type parameter (generic) declarations.
+    sequence<Generic> generics;
+
+    /// A list of parameters declared for this action.
+    sequence<ActionParam> params;
+
+    /// The action's return type.
+    TyExprId? ret_ty_expr;
+
+    /// Type parameter constraints, specified in a `where`-clause.
+    sequence<TyConstraint> ty_constraints;
+};
+
+/// An action parameter.
+[Remote] dictionary ActionParam {
+    /// A list of annotations for this parameter declaration.
+    sequence<AnnotationId> annotations;
+
+    /// The name of the parameter.
+    Name name;
+
+    /// The type of the parameter.
+    TyExprId ty_expr;
+};
+
+/// An automaton declaration.
+[Remote] dictionary DeclAutomaton {
+    /// A list of annotations for this declaration.
+    sequence<AnnotationId> annotations;
+
+    /// Whether this is an automaton concept declaration.
+    boolean is_concept;
+
+    /// The name of the automaton, possibly qualified with type parameter (generic) declarations.
+    QualifiedTyName name;
+
+    /// Automaton constructor variable declarations.
+    sequence<DeclId> constructor_variables;
+
+    /// The type modeled by this automaton.
+    TyExprId ty_expr;
+
+    /// A list of concepts implemented by this automaton.
+    sequence<Name> implemented_concepts;
+
+    /// Type parameter constraints, specified in a `where`-clause.
+    sequence<TyConstraint> ty_constraints;
+
+    /// Entities defined as members of this automaton.
+    sequence<DeclId> decls;
+};
+
+/// A function declaration.
+[Remote] dictionary DeclFunction {
+    /// A list of annotations for this declaration.
+    sequence<AnnotationId> annotations;
+
+    /// Whether the function has a `static` modifier.
+    boolean is_static;
+
+    /// If present, signifies an extension function for an automaton with the specified name.
+    FullName? extension_for;
+
+    /// Whether the function is a method (uses `*.` in its name).
+    boolean is_method;
+
+    /// The function's name.
+    Name name;
+
+    /// A list of type parameter (generic) declarations.
+    sequence<Generic> generics;
+
+    /// A list of the function's parameters.
+    sequence<FunctionParam> params;
+
+    /// The function's return type.
+    TyExprId? ret_ty_expr;
+
+    /// Type parameter constraints, specified in a `where`-clause.
+    sequence<TyConstraint> ty_constraints;
+
+    /// The function's body.
+    FunctionBody? body;
+};
+
+/// A variable declaration.
+///
+/// Depending on the context, it could be any of the following:
+///
+/// - a global variable
+/// - an automaton constructor variable
+/// - a type's member variable
+/// - or a local variable
+[Remote] dictionary DeclVariable {
+    /// A list of annotations for this declaration.
+    sequence<AnnotationId> annotations;
+
+    /// The kind of variable: `var` or `val`.
+    VariableKind kind;
+
+    /// The name of the variable.
+    Name name;
+
+    /// The type of the variable.
+    TyExprId? ty_expr;
+
+    /// An optional variable initializer expression.
+    ExprId? init;
+};
+
+/// The mutability of a variable.
+[Remote] enum VariableKind {
+    /// A mutable variable declaration (`var`).
+    "Var",
+
+    /// An immutable variable declaration (`val`).
+    "Val",
+};
+
+/// An automaton state declaration.
+[Remote] dictionary DeclState {
+    /// The kind of state declaration.
+    StateKind kind;
+
+    /// The name of the state.
+    Name name;
+};
+
+/// An enumeration of possible state declaration kinds.
+[Remote] enum StateKind {
+    /// An initial state declaration.
+    "Initial",
+
+    /// A regular state declaration (neither initial nor final).
+    "Regular",
+
+    /// A final state declaration.
+    "Final",
+};
+
+/// An automaton state transfer function declaration.
+[Remote] dictionary DeclShift {
+    /// A list of previous states covered by this declaration.
+    sequence<Name> from;
+
+    /// A target state for this declaration.
+    Name to;
+
+    /// A list of functions that trigger this transition.
+    sequence<QualifiedFunctionName> by;
+};
+
+/// A function name or its specific overload.
+[Remote] dictionary QualifiedFunctionName {
+    /// The name of the function.
+    Name name;
+
+    /// Optional parameter type qualification to disambiguate overloads.
+    sequence<TyExprId>? params;
+};
+
+/// An automaton constructor declaration.
+[Remote] dictionary DeclConstructor {
+    /// A list of annotations for this declaration.
+    sequence<AnnotationId> annotations;
+
+    /// Whether the constructor is a method (uses `*.` in its name).
+    boolean is_method;
+
+    /// The constructor's name.
+    Name? name;
+
+    /// The location of the `constructor` keyword (to refer succinctly to if `name` is `None`).
+    Loc kw_loc;
+
+    /// A list of the constructor's parameters.
+    sequence<FunctionParam> params;
+
+    /// The constructor's return type.
+    TyExprId? ret_ty_expr;
+
+    /// The constructor's body.
+    FunctionBody? body;
+};
+
+/// An automaton destructor declaration.
+[Remote] dictionary DeclDestructor {
+    /// A list of annotations for this declaration.
+    sequence<AnnotationId> annotations;
+
+    /// Whether the destructor is a method (uses `*.` in its name).
+    boolean is_method;
+
+    /// The destructor's name.
+    Name? name;
+
+    /// The location of the `destructor` keyword (to refer succinctly to if `name` is `None`).
+    Loc kw_loc;
+
+    /// A list of the destructor's parameters.
+    sequence<FunctionParam> params;
+
+    /// The destructor's return type.
+    TyExprId? ret_ty_expr;
+
+    /// The destructor's body.
+    FunctionBody? body;
+};
+
+/// A procedure declaration.
+[Remote] dictionary DeclProc {
+    /// A list of annotations for this declaration.
+    sequence<AnnotationId> annotations;
+
+    /// Whether the procedure is marked as `pure`.
+    boolean is_pure;
+
+    /// Whether the procedure is a method (uses `*.` in its name).
+    boolean is_method;
+
+    /// The procedure's name.
+    Name name;
+
+    /// A list of type parameter (generic) declarations.
+    sequence<Generic> generics;
+
+    /// A list of the procedure's parameters.
+    sequence<FunctionParam> params;
+
+    /// The procedure's return type.
+    TyExprId? ret_ty_expr;
+
+    /// Type parameter constraints, specified in a `where`-clause.
+    sequence<TyConstraint> ty_constraints;
+
+    /// The procedure's body.
+    FunctionBody? body;
+};
+
+/// A predicate declaration.
+[Remote] dictionary DeclPred {
+    /// A list of annotations for this declaration.
+    sequence<AnnotationId> annotations;
+
+    /// The predicate's name.
+    Name name;
+
+    /// A list of type parameter (generic) declarations.
+    sequence<Generic> generics;
+
+    /// A list of the predicate's parameters.
+    sequence<FunctionParam> params;
+
+    /// Type parameter constraints, specified in a `where`-clause.
+    sequence<TyConstraint> ty_constraints;
+
+    /// The predicate's body.
+    PredId? body;
+};
+
+/// A function parameter declaration.
+[Remote] dictionary FunctionParam {
+    /// A list of annotations for this parameter declaration.
+    sequence<AnnotationId> annotations;
+
+    /// The name of the parameter.
+    Name name;
+
+    /// The type of the parameter.
+    TyExprId ty_expr;
+};
+
+/// The body of a function.
+[Remote] dictionary FunctionBody {
+    /// The function's contract specifications.
+    sequence<Contract> contracts;
+
+    /// A list of statements comprising the body of the function.
+    sequence<StmtId> stmts;
+};
+
+/// A function contract specification.
+[Enum] interface FFIContract {
+    /// A precondition specification.
+    Requires(ContractRequires contract);
+
+    /// A postcondition specification.
+    Ensures(ContractEnsures contract);
+
+    /// A write set specification.
+    Assigns(ContractAssigns contract);
+};
+[Custom]
+typedef FFIContract Contract;
+
+/// A precondition specification.
+[Remote] dictionary ContractRequires {
+    /// The contract predicate.
+    PredId pred;
+};
+
+/// A postcondition specification.
+[Remote] dictionary ContractEnsures {
+    /// The contract predicate.
+    PredId pred;
+};
+
+/// A write set specification.
+[Remote] dictionary ContractAssigns {
+    /// The contract's name.
+    Name? name;
+
+    /// The contract expression.
+    ExprId expr;
+};
+
+/// An annotation use.
+[Remote] dictionary Annotation {
+    /// The identifier of this annotation.
+    AnnotationId id;
+
+    /// The annotation use's location in the source text.
+    Loc loc;
+
+    /// The name of the annotation.
+    Name name;
+
+    /// A list of arguments to this annotation.
+    sequence<AnnotationArg> args;
+};
+
+/// An annotation argument supplied at the point of an annotation's use.
+[Remote] dictionary AnnotationArg {
+    /// The name of the parameter.
+    Name? name;
+
+    /// The argument expression.
+    ExprId expr;
+};
+
+/// A type name qualified with type parameter declarations.
+[Remote] dictionary QualifiedTyName {
+    /// The name of the type.
+    FullName ty_name;
+
+    /// A list of type parameter (generic) declarations.
+    sequence<Generic> generics;
+};
+
+/// A full name to an entity, consisting of several components separated with a period.
+[Remote] dictionary FullName {
+    /// The name's location in the source text.
+    Loc loc;
+
+    /// A list of the name's components.
+    ///
+    /// Each component is a single identifier in the period-separated sequence.
+    sequence<Name> components;
+};
+
+/// A name in the source file paired with its location information.
+[Remote] dictionary Name {
+    /// The name's location in the source text.
+    Loc loc;
+
+    /// The name string.
+    ///
+    /// For LibSL export, must be a valid LibSL identifier.
+    string name;
+};
+
+/// A constraint on a type parameter.
+[Remote] dictionary TyConstraint {
+    /// The name of the type parameter bounded by this constraint.
+    Name param;
+
+    /// The bound for the type parameter.
+    TyExprId bound;
+};
+
+/// A type parameter (generic) declaration.
+[Remote] dictionary Generic {
+    /// An explicit variance specification, if any.
+    Variance? variance;
+
+    /// The name of the type parameter.
+    Name name;
+};
+
+/// An enumeration of possible variance specifications.
+[Remote] enum Variance {
+    /// Covariant: `U <: V` implies `T[U] <: T[V]`.
+    ///
+    /// Corresponds to TypeScript's `out` variance specifier.
+    "Covariant",
+
+    /// Contravariant: `U <: V` implies `T[U] >: T[V]`.
+    ///
+    /// Corresponds to TypeScript's `in` variance specifier.
+    "Contravariant",
+
+    /// Invariant: a subtype relation between `U` and `V` does not imply anything about the subtype
+    /// relation between `T[U]` and `T[V]`.
+    ///
+    /// Corresponds to TypeScript's `in out` variance specifier.
+    "Invariant",
+};
+
+/// A type expression, denoting a particular type in the type system.
+[Remote] dictionary TyExpr {
+    /// A unique identifier for this type expression, usable as a (secondary) slotmap key.
+    ///
+    /// This allows to associate additional information with the type expression as well as refer to
+    /// it without violating borrowing rules.
+    TyExprId id;
+
+    /// The type expression's location in the source text.
+    Loc loc;
+
+    /// What kind of type expression this is.
+    ///
+    /// The variants hold data specific to each type expression kind.
+    TyExprKind kind;
+};
+
+/// An enumeration of all possible type expression kinds.
+[Enum] interface FFITyExprKind {
+    /// A dummy type expression, the default value of `TyExprKind`.
+    ///
+    /// Allows using `mem::take` to take ownership of the value.
+    Dummy();
+
+    /// A literal expression of a primitive type.
+    PrimitiveLit(TyExprPrimitiveLit expr);
+
+    /// A type name expression.
+    Name(TyExprName expr);
+
+    /// A pointer type expression.
+    Pointer(TyExprPointer expr);
+
+    /// An intersection type expression.
+    Intersection(TyExprIntersection expr);
+
+    /// A union type expression.
+    Union(TyExprUnion expr);
+};
+[Custom]
+typedef FFITyExprKind TyExprKind;
+
+/// A literal expression of a primitive type.
+[Remote] dictionary TyExprPrimitiveLit {
+    /// The primitive literal comprising this type expression.
+    PrimitiveLit lit;
+};
+
+/// A type name expression.
+[Remote] dictionary TyExprName {
+    /// The referred type's name.
+    FullName ty_name;
+
+    /// A list of type arguments for the referred type.
+    sequence<TyArg>? generics;
+};
+
+/// A pointer type expression.
+[Remote] dictionary TyExprPointer {
+    /// A base type the pointer refers to.
+    TyExprId base;
+};
+
+/// An intersection type expression.
+[Remote] dictionary TyExprIntersection {
+    /// The left type expression.
+    TyExprId lhs;
+
+    /// The right type expression.
+    TyExprId rhs;
+};
+
+/// A union type expression.
+[Remote] dictionary TyExprUnion {
+    /// The left type expression.
+    TyExprId lhs;
+
+    /// The right type expression.
+    TyExprId rhs;
+};
+
+/// A type argument for a generic type's type parameter.
+[Enum] interface FFITyArg {
+    /// An arbitrary type expression.
+    TyExpr(Variance? variance, TyExprId ty_expr);
+
+    /// A type wildcard, useful in situations where the exact type for the parameter is not
+    /// required.
+    Wildcard(Loc loc);
+};
+[Custom]
+typedef FFITyArg TyArg;
+
+/// A predicate in a contract's specification.
+[Remote] dictionary Pred {
+    /// A unique identifier for this predicate, usable as a (secondary) slotmap key.
+    ///
+    /// This allowed to associate additional information with the statement as well as refer to it
+    /// without violating borrowing rules.
+    PredId id;
+
+    /// The predicate's location in the source text.
+    Loc loc;
+
+    /// What kind of predicate this is.
+    ///
+    /// The variants hold data specific to each predicate kind.
+    PredKind kind;
+};
+
+/// An enumeration of all possible predicate kinds.
+[Enum] interface FFIPredKind {
+    /// A dummy predicate, the default value of `PredKind`.
+    /// Allows using `mem::take` to take ownership of the value.
+    Dummy();
+
+    /// A predicate block, representing a conjunction of predicates.
+    Block(PredBlock pred);
+
+    /// A predicate prefixed with a name.
+    Named(PredNamed pred);
+
+    /// A variable declaration.
+    Decl(DeclId pred);
+
+    /// A conditional predicate (representing an implication).
+    If(PredIf pred);
+
+    /// An expression predicate.
+    Expr(ExprId pred);
+};
+[Custom]
+typedef FFIPredKind PredKind;
+
+/// A predicate block, representing a conjunction of predicates.
+[Remote] dictionary PredBlock {
+    /// The sub-predicates this predicate is composed of.
+    sequence<PredId> preds;
+};
+
+/// A named predicate.
+[Remote] dictionary PredNamed {
+    /// The name assigned to this predicate.
+    Name name;
+
+    /// The predicate being named.
+    PredId pred;
+};
+
+/// A conditional predicate, representing an implication.
+[Remote] dictionary PredIf {
+    /// The condition (the antecedent of the implication).
+    ExprId cond;
+
+    /// The consequent of the implication, which determines the truth value of the predicate when the condition is true.
+    PredId then_branch;
+
+    /// The alternative, which determines the truth value of the predicate when the condition is
+    /// false.
+    PredId? else_branch;
+};
+
+/// A statement in a function body.
+[Remote] dictionary Stmt {
+    /// A unique identifier for this statement, usable as a (secondary) slotmap key.
+    ///
+    /// This allows to associate additional information with the statement as well as refer to it
+    /// without violating borrowing rules.
+    StmtId id;
+
+    /// The statement's location in the source text.
+    Loc loc;
+
+    /// What kind of statement this is.
+    ///
+    /// The variants hold data specific to each statement kind.
+    StmtKind kind;
+};
+
+/// An enumeration of all possible statement kinds.
+[Enum] interface FFIStmtKind {
+    /// A dummy statement, the default value of `StmtKind`.
+    /// Allows using `mem::take` to take ownership of the value.
+    Dummy();
+
+    /// A variable declaration.
+    Decl(DeclId stmt);
+
+    /// A conditional statement.
+    If(StmtIf stmt);
+
+    /// A variable assignment statement.
+    Assign(StmtAssign stmt);
+
+    /// A state transition cancellation statement.
+    Cancel(StmtCancel stmt);
+
+    /// An expression statement.
+    Expr(ExprId stmt);
+};
+[Custom]
+typedef FFIStmtKind StmtKind;
+
+/// A conditional statement.
+[Remote] dictionary StmtIf {
+    /// The if statement's condition.
+    ExprId cond;
+
+    /// A sequence of statements evaluated when the condition is true.
+    sequence<StmtId> then_branch;
+
+    /// A sequence of statements evaluated when the condition is false.
+    sequence<StmtId> else_branch;
+};
+
+/// A variable assignment statement.
+[Remote] dictionary StmtAssign {
+    /// The place this statement assigns to. Either of:
+    /// - [`ExprName`]
+    /// - [`ExprField`]
+    /// - [`ExprIndex`]
+    ExprId lhs;
+
+    /// An optional in-place update operator.
+    InPlaceOp? in_place_op;
+
+    /// The expression assigned to the place.
+    ExprId rhs;
+};
+
+/// An in-place update operator.
+[Remote] enum InPlaceOp {
+    /// Addition.
+    "Add",
+
+    /// Subtraction.
+    "Sub",
+
+    /// Multiplication.
+    "Mul",
+
+    /// Division.
+    "Div",
+
+    /// Modulus.
+    "Mod",
+
+    /// Bitwise and.
+    "BitAnd",
+
+    /// Bitwise or.
+    "BitOr",
+
+    /// Bitwise xor.
+    "BitXor",
+
+    /// Arithmetic (signed) left shift.
+    "Sal",
+
+    /// Arithmetic (signed) right shift.
+    "Sar",
+};
+
+/// A state transition cancellation statement.
+[Remote] dictionary StmtCancel {};
+
+/// A LibSL expression.
+[Remote] dictionary Expr {
+    /// A unique identifier for this expression, usable as a (secondary) slotmap key.
+    ///
+    /// This allows to associate additional informatino with the expression as well as refer to it
+    /// without violating borrowing rule.
+    ExprId id;
+
+    /// The expression's location in the source text.
+    Loc loc;
+
+    /// What kind of expression this is.
+    ///
+    /// The variants hold data specific to each expression kind.
+    ExprKind kind;
+};
+
+/// An enumeration of all possible expression kinds.
+[Enum] interface FFIExprKind {
+    /// A dummy expression, the default value of `ExprKind`.
+    ///
+    /// Allows using `mem::take` to take ownership of the value.
+    Dummy();
+
+    /// A literal expression of a primitive type.
+    PrimitiveLit(ExprPrimitiveLit expr);
+
+    /// An array literal expression.
+    ArrayLit(ExprArrayLit expr);
+
+    /// A set literal expression.
+    SetLit(ExprSetLit expr);
+
+    /// A procedure call expression.
+    ProcCall(ExprProcCall expr);
+
+    /// An action invocation expression.
+    ActionCall(ExprActionCall expr);
+
+    /// An automaton instantiation expression.
+    Instantiate(ExprInstantiate expr);
+
+    /// A name expression.
+    Name(ExprName expr);
+
+    /// A previous-state value expression.
+    Prev(ExprPrev expr);
+
+    /// A field access expression.
+    Field(ExprField expr);
+
+    /// A pointer dereference expression.
+    Deref(ExprDeref expr);
+
+    /// An index access expression.
+    Index(ExprIndex expr);
+
+    /// A `has`-concept expression.
+    HasConcept(ExprHasConcept expr);
+
+    /// A cast expression.
+    Cast(ExprCast expr);
+
+    /// A type comparison expression.
+    TyCompare(ExprTyCompare expr);
+
+    /// A unary arithmetic/logical expression.
+    Unary(ExprUnary expr);
+
+    /// A binary arithmetic/logical expression.
+    Binary(ExprBinary expr);
+};
+[Custom]
+typedef FFIExprKind ExprKind;
+
+/// A literal expression of a primitive type.
+[Remote] dictionary ExprPrimitiveLit {
+    /// The primitive literal comprising this expression.
+    PrimitiveLit lit;
+};
+
+/// An array literal expression.
+[Remote] dictionary ExprArrayLit {
+    /// A list of array elements.
+    sequence<ExprId> elems;
+};
+
+/// A set literal expression.
+[Remote] dictionary ExprSetLit {
+    /// A list of set elements.
+    sequence<ExprId> elems;
+};
+
+/// A procedure call expression.
+[Remote] dictionary ExprProcCall {
+    /// The receiver expression.
+    ExprId? recv;
+
+    /// The procedure called in this expression.
+    Name name;
+
+    /// A list of type arguments for the callee.
+    sequence<TyArg>? generics;
+
+    /// A list of arguments to the procedure call.
+    sequence<ExprId> args;
+};
+
+/// An action invocation expression.
+[Remote] dictionary ExprActionCall {
+    /// The action invoked in this expression.
+    Name name;
+
+    /// A list of type arguments for the action.
+    sequence<TyArg>? generics;
+
+    /// A list of arguments to the action invocation.
+    sequence<ExprId> args;
+};
+
+/// An automaton instantiation expression.
+[Remote] dictionary ExprInstantiate {
+    /// The name of an automaton.
+    FullName name;
+
+    /// A list of type arguments for the automaton.
+    sequence<TyArg>? generics;
+
+    /// A list of arguments to the automaton's constructor.
+    sequence<ConstructorArg> args;
+};
+
+/// A name expression.
+[Remote] dictionary ExprName {
+    /// The variable name.
+    Name name;
+};
+
+/// A previous-state value expression.
+[Remote] dictionary ExprPrev {
+    /// The variable/element referred to by this expression.
+    ExprId base;
+};
+
+/// A field access expression.
+[Remote] dictionary ExprField {
+    /// The base part of the expression (preceding the dot).
+    ExprId base;
+
+    /// The name of the field.
+    Name field;
+};
+
+/// A pointer dereference expression.
+[Remote] dictionary ExprDeref {
+    /// The base part of the expression (preceding the dot).
+    ExprId base;
+};
+
+/// An index access expression,
+[Remote] dictionary ExprIndex {
+    /// The base part of the expression (preceding the brackets).
+    ExprId base;
+
+    /// The index expression.
+    ExprId index;
+};
+
+/// An argument for an automaton instantiation expression.
+[Enum] interface FFIConstructorArg {
+    /// An automaton state assignment.
+    State(Loc loc, Name name);
+
+    /// A value for a constructor variable.
+    Var(Loc loc, Name name, ExprId expr);
+};
+[Custom]
+typedef FFIConstructorArg ConstructorArg;
+
+/// A `has`-concept expression.
+[Remote] dictionary ExprHasConcept {
+    /// An expression being tested.
+    ExprId scrutinee;
+
+    /// Whether to invert the expectation (testing that the scrutinee does *not* have the concept).
+    boolean negate;
+
+    /// A concept the scrutinee is tested for.
+    Name concept;
+};
+
+/// A cast expression.
+[Remote] dictionary ExprCast {
+    /// The expression being cast.
+    ExprId expr;
+
+    /// A type the expression is cast to.
+    TyExprId ty_expr;
+};
+
+/// An type comparison expression.
+[Remote] dictionary ExprTyCompare {
+    /// The expression whose type is tested for.
+    ExprId expr;
+
+    /// Whether to invert the expectation (testing that the expression does *not* have the type).
+    boolean negate;
+
+    /// An expected expression type.
+    TyExprId ty_expr;
+};
+
+/// A unary arithmetic or logical expression.
+[Remote] dictionary ExprUnary {
+    /// A unary operator.
+    UnOp op;
+
+    /// The operand of the unary operator.
+    ExprId expr;
+};
+
+/// An enumeration of all unary operators that can be used in [`ExprUnary`].
+[Remote] enum UnOp {
+    /// Unary plus.
+    "Plus",
+
+    /// Negation (unary minus).
+    "Neg",
+
+    /// Bitwise negation.
+    "BitNot",
+
+    /// Logical negation.
+    "Not",
+};
+
+/// A binary arithmetic or logical expression.
+[Remote] dictionary ExprBinary {
+    /// The left operand of the operator.
+    ExprId lhs;
+
+    /// A binary operator.
+    BinOp op;
+
+    /// The right operand of the operator.
+    ExprId rhs;
+};
+
+/// An enumeration of all binary operators that can be used in [`ExprBinary`].
+[Remote] enum BinOp {
+    /// Multiplication.
+    "Mul",
+
+    /// Division.
+    "Div",
+
+    /// Modulus.
+    "Mod",
+
+    /// Addition.
+    "Add",
+
+    /// Subtraction.
+    "Sub",
+
+    /// Arithmetic (signed) left shift.
+    "Sal",
+
+    /// Arithmetic (signed) right shift.
+    "Sar",
+
+    /// Logical (unsigned) left shift.
+    "Shl",
+
+    /// Logical (unsigned) right shift.
+    "Shr",
+
+    /// Bitwise or.
+    "BitOr",
+
+    /// Bitwise xor.
+    "BitXor",
+
+    /// Bitwise and.
+    "BitAnd",
+
+    /// Less than.
+    "Lt",
+
+    /// Less than or equal to.
+    "Le",
+
+    /// Greater than.
+    "Gt",
+
+    /// Greater than or equal to.
+    "Ge",
+
+    /// Equals.
+    "Eq",
+
+    /// Not equals.
+    "Ne",
+
+    /// Member of.
+    "In",
+
+    /// Not member of.
+    "NotIn",
+
+    /// Logical or.
+    "Or",
+
+    /// Logical and.
+    "And",
+};
+
+/// A literal of a primitive type, usable in both expression and type expression contexts.
+[Enum] interface FFIPrimitiveLit {
+    /// An integer literal.
+    Int(IntLit lit);
+
+    /// A floating-point number literal.
+    Float(FloatLit lit);
+
+    /// A string literal.
+    String(string lit);
+
+    /// A character literal.
+    Char(u32 lit);
+
+    /// A boolean literal.
+    Bool(boolean lit);
+
+    /// The `null` literal.
+    Null();
+};
+[Custom]
+typedef FFIPrimitiveLit PrimitiveLit;
+
+/// An integer literal.
+[Enum] interface FFIIntLit {
+    /// A signed byte literal (suffix `x`).
+    I8(i8 num);
+
+    /// An unsigned byte literal (suffix `ux`).
+    U8(u8 num);
+
+    /// A signed short integer literal (suffix `s`).
+    I16(i16 num);
+
+    /// An unsigned short integer literal (suffix `us`).
+    U16(u16 num);
+
+    /// A signed integer literal (no suffix).
+    I32(i32 num);
+
+    /// An unsigned integer literal (suffix `u`).
+    U32(u32 num);
+
+    /// A signed long integer literal (suffix `l`/`L`).
+    I64(i64 num);
+
+    /// An unsigned long integer literal (suffix `uL`).
+    U64(u64 num);
+};
+[Custom]
+typedef FFIIntLit IntLit;
+
+/// A floating-point number literal.
+[Enum] interface FFIFloatLit {
+    /// A float literal (suffix `f`).
+    F32(float num);
+
+    /// A double literal (no suffix / suffix `d`).
+    F64(double num);
+};
+[Custom]
+typedef FFIFloatLit FloatLit;
+
+namespace libsl {};
