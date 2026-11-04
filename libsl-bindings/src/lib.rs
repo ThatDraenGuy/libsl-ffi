@@ -1,9 +1,12 @@
 pub mod ast;
+pub mod bridge;
 pub mod loc;
+pub mod parse;
 
 use ast::*;
 use libsl::{AnnotationId, DeclId, ExprId, FileId, PredId, StmtId, TyExprId};
 use loc::*;
+use parse::*;
 use slotmap::{Key, KeyData};
 use std::num::NonZeroUsize;
 
@@ -63,14 +66,12 @@ uniffi::custom_type!(AnnotationId, u64, {
 
 uniffi::include_scaffolding!("libsl");
 
-// use slotmap::Key;
 // use std::error::Error;
 
 // use libsl::{
 //     diag::DummyDiagCtx,
 //     file::{self, FsFileLoader},
 //     sema::ImportCtx,
-//     FileId,
 // };
 
 // fn test() -> Result<(), Box<dyn Error>> {

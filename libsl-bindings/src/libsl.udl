@@ -48,6 +48,42 @@ typedef FFILoc Loc;
     NonZeroUsize? col;
 };
 
+//====== parse.rs ======
+
+/// The radix of an integer literal.
+[Remote] enum Radix {
+    /// Binary (`0b` prefix).
+    "Binary",
+
+    /// Octal (`0` prefix).
+    "Octal",
+
+    /// Decimal (no prefix).
+    "Decimal",
+
+    /// Hexadecimal (`0x` prefix).
+    "Hexadecimal",
+};
+
+/// An error that occurred while parsing a file.
+[Error, Remote] interface ParseError {
+    /// A syntax error.
+    Syntax(FileId file_id, NonZeroUsize? line, NonZeroUsize? col, usize len, string msg);
+    /// Could not parse an integer literal.
+    Int(Radix radix, FileId file_id, NonZeroUsize? line, NonZeroUsize? col, usize len, ParseIntError inner);
+};
+
+enum FFIParseIntError {
+    "Empty",
+    "InvalidDigit",
+    "PosOverflow",
+    "NegOverflow",
+    "Zero",
+    "Unknown",
+};
+[Custom]
+typedef FFIParseIntError ParseIntError;
+
 //====== ast.rs ======
 
 /// A LibSL header declaration.

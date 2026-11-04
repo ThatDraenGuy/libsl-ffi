@@ -6,11 +6,6 @@ uniffi::custom_type!(Loc, FFILoc, {
     try_lift: |loc| Ok(loc.into())
 });
 
-#[uniffi::export]
-pub fn wrap(span: Span) -> Loc {
-    Loc::Span(span)
-}
-
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub enum FFILoc {
     #[default]
